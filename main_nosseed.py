@@ -24,6 +24,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 code_path = os.path.dirname(os.path.realpath(__file__))
 print('code_path:', code_path)
 result_path = code_path + '/result/'
+data_pa = code_path+'/data/'
 if not os.path.exists(result_path):
     os.makedirs(result_path)
 
@@ -38,21 +39,14 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def main():
     if DATASET == 'davis':
-        data_path = f"/data/hkt/work_DAT/work_graphgps/mam_dtitr/data/dtdav/4"
+        data_path = f"{data_pa}/davis/"
         train_data = pd.read_csv(f"{data_path}/train.csv")
         valid_data = pd.read_csv(f"{data_path}/valid.csv")
         test_data = valid_data
         max_smiles_len = 85
         max_fasta_len = 1000
     if DATASET == 'kiba':
-        data_path = f"/data/hkt/work_DAT/work_graphgps/mam_dtitr_qs/data/dtkiba/4"
-        train_data = pd.read_csv(f"{data_path}/train.csv")
-        valid_data = pd.read_csv(f"{data_path}/valid.csv")
-        test_data = valid_data
-        max_smiles_len = 100
-        max_fasta_len = 1000
-    if DATASET == 'Bind':
-        data_path = f"/data/hkt/work_DAT/work_graphgps/mam_dtitr_qs/data/binddb_kd/4"
+        data_path = f"{data_pa}/kiba"
         train_data = pd.read_csv(f"{data_path}/train.csv")
         valid_data = pd.read_csv(f"{data_path}/valid.csv")
         test_data = valid_data
@@ -112,49 +106,6 @@ def main():
 
     del model
 
-
-
-def process_graph(compound_graph, protein_graph):
-    # 处理化合物图
-    c = compound_graph.ndata
-    cx = torch.as_tensor(c["atom"], dtype=torch.float32, device="cpu")
-    cpos = c['lap_pos_enc']
-    ce = torch.as_tensor(compound_graph.edata['bond'], dtype=torch.float32, device="cpu")
-    ces, cet = compound_graph.edges()
-
-    csrc_nodes = ces.clone().detach()
-    cdst_nodes = cet.clone().detach()
-    # csrc_nodes = ces.detach()
-    # cdst_nodes = cet.detach()
-    cedge_index = torch.stack([csrc_nodes, cdst_nodes])
-    compound_tg = torch_geometric.data.Data(x=cx, edge_index=cedge_index, edge_attr=ce, lap_pos=cpos)
-
-    # 处理蛋白质图
-    p = protein_graph.ndata
-    px = torch.as_tensor(p["feats"], dtype=torch.float32, device="cpu")
-    ppos = p['lap_pos_enc']
-    pe = torch.as_tensor(protein_graph.edata['feats'], dtype=torch.float32, device="cpu")
-    pes, pet = protein_graph.edges()
-
-    psrc_nodes = pes.clone().detach()
-    pdst_nodes = pet.clone().detach()
-    # psrc_nodes = pes.detach()
-    # pdst_nodes = pet.detach()
-    pedge_index = torch.stack([psrc_nodes, pdst_nodes])
-    protein_tg = torch_geometric.data.Data(x=px, edge_index=pedge_index, edge_attr=pe, lap_pos=ppos)
-
-    return compound_tg, protein_tg
-
-
-def process_graphs_parallel(compound_graphs, protein_graphs):
-    # with Parallel(n_jobs=-1,verbose=1) as parallel:
-        # 并行处理每个图
-    results = Parallel(n_jobs=-1,verbose=1)(delayed(process_graph)(compound_graph, protein_graph) for compound_graph, protein_graph in zip(compound_graphs, protein_graphs))
-
-    # 获取并行处理结果
-    compound_graphs_parallel, protein_graphs_parallel = zip(*results)
-
-    return compound_graphs_parallel, protein_graphs_parallel
 
 
 
