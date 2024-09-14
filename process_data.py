@@ -4,7 +4,7 @@ from rdkit.Chem import MACCSkeys
 from rdkit import Chem
 from joblib import Parallel, delayed
 
-from compound_process import smiles_to_graph
+from utils.drug_process import smi_to_graph
 
 from concurrent.futures import ThreadPoolExecutor
 import os
@@ -71,8 +71,6 @@ def prot_pt_file(fir,name):
     return data
 
 
-# def smil_pt_file(fir,name):
-    return torch.load(f"{fir}/{name}.pt")
 
 class DTAData(Dataset):
 
@@ -82,24 +80,18 @@ class DTAData(Dataset):
         #Acession Number,Gene,Kinase,Sequence,Compound,PubChem_Cid,SMILES,Kd
         self.smile_id = data["Kinase"].values.tolist()
         self.fasta_id = data["PubChem_Cid"].values.tolist()
-        # self.cg = []
-        # self.pg = []
+
         self.device = device
-        # self.smiles = data.compound
+
         self.max_smiles_len = max_smiles_len
         self.max_fasta_len = max_fasta_len
-        # self.smile_fp = [smiles_fingerprint(s) for s in self.smiles]
-        # self.pro_char = [label_chars(f,1000,CHARPROTSET) for f in self.fasta]
 
         self.smiles_fp = Parallel(n_jobs=16,verbose=1)(delayed(process_smiles_fingerprint)(s) for s in self.smiles)
         self.prot_cha = Parallel(n_jobs=16,verbose=1)(delayed(process_label_chars)(s) for s in self.fasta)
 
-        
-        self.cg =  Parallel(n_jobs=16,verbose=1)(delayed(smiles_to_graph)(s) for s in self.smiles)
-        # self.pg =  Parallel(n_jobs=16,verbose=1)(delayed(prot_pt_file)(dir_379,s) for s in self.fasta_id)
+        self.cg =  Parallel(n_jobs=16,verbose=1)(delayed(smi_to_graph)(s) for s in self.smiles)
 
         self.label = torch.tensor(data["Kd"].values.tolist(), dtype=torch.float32)
-        # self.label = torch.round(self.label*1000)/1000
 
 
         print(len(self.smiles_fp))
