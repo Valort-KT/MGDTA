@@ -21,9 +21,6 @@ class GPSLayer(nn.Module):
                  attn_dropout=0.0, layer_norm=False, batch_norm=True,
                  bigbird_cfg=None, log_attn_weights=False,emb_dim = None,signet_dim=None):
         super().__init__()
-        # self.emb = nn.Linear(emb_dim,128)
-        # self.signet = nn.Linear(signet_dim,128)
-        # self.linear_e = nn.Linear(10,128)
 
         self.dim_h = out_cha
         self.num_heads = num_heads
@@ -45,15 +42,7 @@ class GPSLayer(nn.Module):
                 in_cha, num_heads, dropout=self.attn_dropout, batch_first=True)
 
 
-        # Normalization for MPNN and Self-Attention representations.
-        # if self.layer_norm:
-        #     self.norm1_local = pygnn.norm.LayerNorm(dim_h)
-        #     self.norm1_attn = pygnn.norm.LayerNorm(dim_h)
-        #     # self.norm1_local = pygnn.norm.GraphNorm(dim_h)
-        #     # self.norm1_attn = pygnn.norm.GraphNorm(dim_h)
-        #     # self.norm1_local = pygnn.norm.InstanceNorm(dim_h)
-        #     # self.norm1_attn = pygnn.norm.InstanceNorm(dim_h)
-        # if self.batch_norm:
+
         self.norm1_local = nn.BatchNorm1d(self.dim_h)
         self.norm1_attn = nn.BatchNorm1d(self.dim_h)
         self.dropout_local = nn.Dropout(dropout)
@@ -63,11 +52,7 @@ class GPSLayer(nn.Module):
         self.ff_linear1 = nn.Linear(self.dim_h, self.dim_h * 2)
         self.ff_linear2 = nn.Linear(self.dim_h * 2, self.dim_h)
         self.act_fn_ff = self.activation()
-        # if self.layer_norm:
-        #     self.norm2 = pygnn.norm.LayerNorm(dim_h)
-        #     # self.norm2 = pygnn.norm.GraphNorm(dim_h)
-        #     # self.norm2 = pygnn.norm.InstanceNorm(dim_h)
-        # if self.batch_norm:
+
         self.norm2 = nn.BatchNorm1d(self.dim_h)
         self.ff_dropout1 = nn.Dropout(dropout)
         self.ff_dropout2 = nn.Dropout(dropout)
@@ -88,9 +73,6 @@ class GPSLayer(nn.Module):
 
         # Multi-head attention.
 
-        # h_dense, mask = to_dense_batch(h, batch.batch)
-        # h_attn = self._sa_block(h_dense, None, ~mask)[mask]
-        # h_attn = self._sa_block(h_dense, None, ~mask)[mask]
         h_attn = self.self_attn(h,h,h)[0]
 
 
@@ -101,7 +83,6 @@ class GPSLayer(nn.Module):
         h_out_list.append(h_attn)
 
         # Combine local and global outputs.
-        # h = torch.cat(h_out_list, dim=-1)
         h = sum(h_out_list)
 
         # Feed Forward block.
@@ -137,9 +118,3 @@ class GPSLayer(nn.Module):
         x = self.ff_dropout1(self.act_fn_ff(self.ff_linear1(x)))
         return self.ff_dropout2(self.ff_linear2(x))
 
-    # def extra_repr(self):
-    #     s = f'summary: dim_h={self.dim_h}, ' \
-    #         f'local_gnn_type={self.local_gnn_type}, ' \
-    #         f'global_model_type={self.global_model_type}, ' \
-    #         f'heads={self.num_heads}'
-    #     return s

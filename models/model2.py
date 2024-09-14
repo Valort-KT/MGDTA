@@ -105,62 +105,7 @@ class Encoder(nn.Module):
             
         out = self.fc_out(out)
         return out
-    
-class DecoderBlock(nn.Module):
-    def __init__(self, embed_size, heads, forward_expansion, dropout, device):
-        super(DecoderBlock, self).__init__()
-        self.attention = SelfAttention(embed_size, heads)
-        self.norm = nn.LayerNorm(embed_size)
-        self.transformer_block = TransformerBlock(
-            embed_size, heads, dropout, forward_expansion
-        )
-        self.dropout = nn.Dropout(dropout)
-    
-    def forward(self, x, value, key, src_mask, trg_mask):
-        attention = self.attention(x, x, x, trg_mask)
-        query  = self.dropout(self.norm(attention + x))
-        out = self.transformer_block(value, key, query, src_mask)
-        return out 
-
-class Decoder(nn.Module):
-    def __init__(
-        self,
-        trg_vocab_size,
-        embed_size,
-        num_layers,
-        heads,
-        forward_expansion,
-        dropout,
-        device,
-        max_length,
-        
-    ):
-        super(Decoder, self).__init__()
-        self.device = device
-        self.word_embedding = nn.Embedding(trg_vocab_size, embed_size)
-        self.position_embedding = nn.Embedding(max_length, embed_size)
-
-        self.layers = nn.ModuleList(
-            [
-                DecoderBlock(embed_size, heads, forward_expansion, dropout, device)
-                for _ in range(num_layers)
-            ]
-        )
-
-        self.fc_out = nn.Linear(embed_size, trg_vocab_size)
-        self.dropout = nn.Dropout(dropout)
-
-    def forward(self, x, enc_out, src_mask, trg_mask):
-        N, seq_length = x.shape
-        positions = torch.arange(0, seq_length).expand(N, seq_length).to(self.device)
-        x = self.dropout(self.word_embedding(x) + self.position_embedding(positions))
-
-        for layer in self.layers:
-            x = layer(x, enc_out, enc_out, src_mask, trg_mask)
-        
-        out = self.fc_out(x)
-        return out
-
+  
 class Transformer(nn.Module):
     def __init__(
         self,
@@ -190,16 +135,7 @@ class Transformer(nn.Module):
             trg_vocab_size
         )
 
-        # self.decoder = Decoder(
-        #     trg_vocab_size,
-        #     embed_size,
-        #     num_layers,
-        #     heads,
-        #     forward_expansion,
-        #     dropout,
-        #     device,
-        #     max_length
-        # )
+
 
         self.src_pad_idx = src_pad_idx
         self.trg_pad_idx = trg_pad_idx
@@ -263,32 +199,23 @@ class FASTAModel2(nn.Module):
     def __init__(self, char_set_len):
         super().__init__()
         self.mam = MixerModel(d_model=166,n_layer=3,vocab_size=char_set_len,rms_norm=True)
-        # self.embed = nn.Embedding(char_set_len, 128)
-        # self.conv1 = nn.Conv1d(in_channels=128, out_channels=32, padding=0, kernel_size=4, stride=1)
-        # self.conv2 = nn.Conv1d(in_channels=32, out_channels=64, padding=0, kernel_size=8, stride=1)
-        # self.conv3 = nn.Conv1d(in_channels=64, out_channels=96, padding=0, kernel_size=12, stride=1)
+
     
     def forward(self, fasta):
         # keras is channal last, different with pytorch
-        # v = self.embed(fasta).transpose(1,2)
-        # v = F.relu(self.conv1(v))
-        # v = F.relu(self.conv2(v))
-        # v = F.relu(self.conv3(v))
         v = self.mam(fasta)
         ve, inid  = torch.max(v, dim=1)
         return ve,v
 
 class Classifier(nn.Sequential):
 
-    def __init__(self, smiles_model, fasta_model,mol_model,prot_model,device):
+    def __init__(self, smiles_model, fasta_model,mol_model,prot_model=None,device=None):
 
         super().__init__()
         self.smiles_model = smiles_model
         self.fasta_model = fasta_model
         self.mol_model = mol_model
-        # self.prot_model = prot_model
 
-        # self.pcross_trans = Cross_Transformer(166, 1, 0.1, 2)
         self.dcross_trans = Cross_Transformer(166, 1, 0.1, 2)
 
         self.fc1 = nn.Linear(332,1024)
@@ -303,18 +230,11 @@ class Classifier(nn.Sequential):
     def forward(self, smiles, fasta,cg):
         v_smiles = self.smiles_model(smiles)
         v_fasta,ve = self.fasta_model(fasta)
-        # v_prot = self.prot_model(pg)
         v_mol = self.mol_model(cg)
-        # v = torch.cat((v_smiles,v_fasta,v_prot,v_mol),-1)
-        # print("v_prot:  ",v_prot.shape, "v_mol:  ",v_mol.shape, "v_smiles:  ",v_smiles.shape, "v_fasta:  ",v_fasta.shape)
+
         v_smiles = torch.unsqueeze(v_smiles,dim=1)
-        # v_fasta = torch.unsqueeze(v_fasta,dim=1)
-        # v_prot = torch.unsqueeze(v_prot,dim=1)
         v_mol = torch.unsqueeze(v_mol,dim=1)
-        # print("v_prot:  ",v_prot.shape, "v_mol:  ",v_mol.shape, "v_smiles:  ",v_smiles.shape, "v_fasta:  ",v_fasta.shape)
 
-
-        # v_pf = self.pcross_trans(v_fasta,v_fasta,v_prot,mask=None)
         v_ms = self.dcross_trans(v_mol,v_mol,v_smiles,mask = None)
         v_ms = torch.squeeze(v_ms,dim=1)
 
